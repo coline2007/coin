@@ -1,65 +1,47 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>마법의 NFC - 오늘의 주식</title>
-    <style>
-        body {
-            text-align: center;
-            font-size: 2rem;
-            margin-top: 15%;
-            background-color: #f4f4f4;
-            font-family: 'Arial', sans-serif;
-        }
-        #message {
-            margin: 30px 0;
-        }
-        #stock {
-            font-size: 1.5rem;
-            color: #0077cc;
-            margin-top: 20px;
-            animation: fadein 1s;
-        }
-        button {
-            padding: 15px 30px;
-            font-size: 1.5rem;
-            border: none;
-            border-radius: 10px;
-            background-color: #222;
-            color: white;
-            cursor: pointer;
-        }
-        @keyframes fadein {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
-</head>
-<body>
-    <p id="message">🔮 마법의 NFC가 말하길... 🔮</p>
-    <button onclick="showStockRecommendation()">오늘의 주식 추천</button>
-    <div id="stock"></div>
+from flask import Flask, jsonify
+import requests
 
-    <script>
-        function showStockRecommendation() {
-            const stocks = [
-                "삼성전자 – AI 반도체 수요 급증 기대 📈",
-                "LG에너지솔루션 – 전기차 배터리 공급 확대 🚗🔋",
-                "NAVER – 플랫폼 개편 후 사용자 수 증가 📊",
-                "현대차 – 친환경차 매출 고성장 📉",
-                "카카오 – 콘텐츠 수익화 강화 중 🎬"
-            ];
-            const messages = [
-                "기다려 보세요.",
-                "안 돼요!",
-                "한 번 더 해보세요.",
-                "좋은 생각이에요!",
-                "다시 시도해보세요."
-            ];
-            document.getElementById("message").innerText = messages[Math.floor(Math.random() * messages.length)];
-            document.getElementById("stock").innerText = stocks[Math.floor(Math.random() * stocks.length)];
-        }
-    </script>
-</body>
-</html>
+app = Flask(__name__)
+
+@app.route('/recommend-stock')
+def recommend_stock():
+    url = "https://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd"
+    payload = {
+        "bld": "dbms/MDC/STAT/standard/MDCSTAT01901",  # KRX 상승률 순위
+        "mktId": "ALL",  # 전체 시장 (KOSPI + KOSDAQ)
+        "trdDd": "20250405"  # 날짜 (오늘 날짜로 자동 처리 필요)
+    }
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+
+    res = requests.post(url, data=payload, headers=headers)
+    data = res.json()["OutBlock_1"][:5]  # 상위 5종목 추출
+
+    stocks = []
+    for stock in data:
+        name = stock["ISU_ABBRV"]
+        rate = stock["FLUC_RT"]
+        price = stock["TDD_CLSPRC"]
+        comment = f"{name} – 현재가 {price}원, 상승률 {rate}% 📈"
+        stocks.append(comment)
+
+    return jsonify(stocks)
+async function showStockRecommendation() {
+    const messageList = [
+        "기다려 보세요.",
+        "좋은 생각이에요!",
+        "마법의 NFC가 예감한 종목입니다 🔮"
+    ];
+
+    const message = messageList[Math.floor(Math.random() * messageList.length)];
+    document.getElementById("message").innerText = message;
+
+    try {
+        const response = await fetch("http://localhost:5000/recommend-stock");  // 백엔드 주소
+        const data = await response.json();
+        const stock = data[Math.floor(Math.random() * data.length)];
+        document.getElementById("stock").innerText = stock;
+    } catch (error) {
+        document.getElementById("stock").innerText = "데이터를 불러오는 데 실패했습니다.";
+    }
